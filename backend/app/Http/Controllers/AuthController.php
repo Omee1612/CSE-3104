@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -19,19 +19,28 @@ class AuthController extends Controller
             'role' => 'required|in:worker,agency,nominee',
         ]);
 
-        $user = User::create([
+        $trackingId = 'DNK-' . date('Y') . '-' . str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $now = now();
+
+        $userId = DB::table('users')->insertGetId([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'],
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
-            'tracking_id' => 'DNK-' . date('Y') . '-' . str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT),
+            'tracking_id' => $trackingId,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
 
-        $token = $user->createToken('dunki-spa')->plainTextToken;
+        $user = DB::select("SELECT * FROM users WHERE id = ?", [$userId])[0];
+
+        $userModel = \App\Models\User::find($userId);
+        $token = $userModel->createToken('dunki-spa')->plainTextToken;
 
         return response()->json(['user' => $user, 'token' => $token], 201);
     }
+
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -39,7 +48,8 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $data['email'])->first();
+        $results = DB::select("SELECT * FROM users WHERE email = ?", [$data['email']]);
+        $user = $results[0] ?? null;
 
         if (!$user || !Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -47,7 +57,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('dunki-spa')->plainTextToken;
+        $userModel = \App\Models\User::find($user->id);
+        $token = $userModel->createToken('dunki-spa')->plainTextToken;
 
         return response()->json(['user' => $user, 'token' => $token]);
     }
@@ -60,6 +71,7 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = DB::select("SELECT * FROM users WHERE id = ?", [$request->user()->id])[0];
+        return response()->json($user);
     }
 }
