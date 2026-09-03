@@ -2,26 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Document;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DocumentController extends Controller
 {
-    // READ — all documents belonging to the logged-in user
     public function index(Request $request)
     {
-        return response()->json(
-            $request->user()->documents()->latest()->get()
+        $documents = DB::select(
+            "SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC",
+            [$request->user()->id]
         );
+        return response()->json($documents);
     }
 
-    // READ — one document
-    public function show(Document $document)
+    public function show(Request $request, $id)
     {
+        $document = DB::select("SELECT * FROM documents WHERE id = ?", [$id])[0] ?? null;
         return response()->json($document);
     }
 
-    // CREATE
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -29,29 +29,37 @@ class DocumentController extends Controller
             'status' => 'nullable|in:missing,complete',
         ]);
 
-        $document = $request->user()->documents()->create($data);
+        $now = now();
+        $id = DB::table('documents')->insertGetId([
+            'user_id' => $request->user()->id,
+            'name' => $data['name'],
+            'status' => $data['status'] ?? 'missing',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
 
+        $document = DB::select("SELECT * FROM documents WHERE id = ?", [$id])[0];
         return response()->json($document, 201);
     }
 
-    // UPDATE
-    public function update(Request $request, Document $document)
+    public function update(Request $request, $id)
     {
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
             'status' => 'sometimes|in:missing,complete',
         ]);
 
-        $document->update($data);
+        $data['updated_at'] = now();
 
+        DB::table('documents')->where('id', $id)->update($data);
+
+        $document = DB::select("SELECT * FROM documents WHERE id = ?", [$id])[0];
         return response()->json($document);
     }
 
-    // DELETE
-    public function destroy(Document $document)
+    public function destroy($id)
     {
-        $document->delete();
-
+        DB::delete("DELETE FROM documents WHERE id = ?", [$id]);
         return response()->json(['message' => 'Document deleted']);
     }
 }

@@ -5,7 +5,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\JobListingController;
+use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\JobApplicationController;
+use App\Http\Controllers\VerificationController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -22,7 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/jobs/{job}', [JobListingController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        // ...existing routes...
+
 
         Route::post('/jobs', [JobListingController::class, 'store']);
         Route::patch('/jobs/{job}', [JobListingController::class, 'update']);
@@ -48,6 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/applications/for-agency', [JobApplicationController::class, 'forAgency']);
         Route::patch('/applications/{application}', [JobApplicationController::class, 'update']);
         Route::delete('/applications/{application}', [JobApplicationController::class, 'destroy']);
+        Route::post('/verification', [VerificationController::class, 'store']);
+        Route::get('/verification/status', [VerificationController::class, 'status']);
+        Route::get('/insights', [InsightsController::class, 'index']);
 
     });
     Route::get('/dashboard', function (\Illuminate\Http\Request $request) {

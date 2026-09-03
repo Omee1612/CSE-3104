@@ -19,8 +19,11 @@ class User extends Authenticatable
         'tracking_id',
         'destination',
         'agency',
+        'verification_status',
+        'verification_document_path',
+        'verification_note',
+        'verified_at',
     ];
-
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
