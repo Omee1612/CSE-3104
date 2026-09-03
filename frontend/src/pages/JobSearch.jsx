@@ -61,12 +61,16 @@ export default function JobSearch() {
           )}
         </header>
 
-        {me?.role === 'agency' && showPostForm && (
-          <PostJobForm
-            onCreated={() => { setShowPostForm(false); loadJobs() }}
-            onError={setError}
-          />
-        )}
+       {me?.role === 'agency' && showPostForm && (
+  <PostJobForm
+    me={me}
+    onCreated={() => {
+      setShowPostForm(false)
+      loadJobs()
+    }}
+    onError={setError}
+  />
+)}
 
         {error && (
           <p className="mt-4 text-sm text-alert bg-alert/10 border border-alert/30 rounded-card px-3.5 py-2.5">
@@ -158,50 +162,111 @@ export default function JobSearch() {
   )
 }
 
-function PostJobForm({ onCreated, onError }) {
+function PostJobForm({ me, onCreated, onError }) {
   const [form, setForm] = useState({
-    title: '', description: '', criteria: '', country: '', city: '', salary: '', agency: '',
+    title: '',
+    description: '',
+    criteria: '',
+    country: '',
+    city: '',
+    salary: '',
   })
+
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
+
     try {
-      await createJob(form)
+      await createJob({
+        ...form,
+        agency: me?.name,
+      })
+
       onCreated()
     } catch (err) {
-      onError(err.response?.data?.message || 'Failed to post job.')
+      onError(
+        err.response?.data?.message ||
+        'Failed to post job.'
+      )
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 bg-white rounded-card border border-navy/10 p-5 grid sm:grid-cols-2 gap-4">
-      <input required placeholder="Job title" value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <textarea required placeholder="Job description" value={form.description} rows={3}
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
-        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <textarea required placeholder="Criteria (skills, experience, documents required)" value={form.criteria} rows={2}
-        onChange={(e) => setForm({ ...form, criteria: e.target.value })}
-        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <input required placeholder="Country" value={form.country}
-        onChange={(e) => setForm({ ...form, country: e.target.value })}
-        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <input required placeholder="City" value={form.city}
-        onChange={(e) => setForm({ ...form, city: e.target.value })}
-        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <input required placeholder="Salary, e.g. 1,800 SAR / month" value={form.salary}
-        onChange={(e) => setForm({ ...form, salary: e.target.value })}
-        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <input required placeholder="Agency name" value={form.agency}
-        onChange={(e) => setForm({ ...form, agency: e.target.value })}
-        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp" />
-      <button type="submit" disabled={submitting}
-        className="sm:col-span-2 mt-1 rounded-card bg-navy text-paper text-sm font-medium py-2.5 hover:bg-navy-600 transition-colors disabled:opacity-50">
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 bg-white rounded-card border border-navy/10 p-5 grid sm:grid-cols-2 gap-4"
+    >
+      <input
+        required
+        placeholder="Job title"
+        value={form.title}
+        onChange={(e) =>
+          setForm({ ...form, title: e.target.value })
+        }
+        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <textarea
+        required
+        placeholder="Job description"
+        value={form.description}
+        rows={3}
+        onChange={(e) =>
+          setForm({ ...form, description: e.target.value })
+        }
+        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <textarea
+        required
+        placeholder="Criteria (skills, experience, documents required)"
+        value={form.criteria}
+        rows={2}
+        onChange={(e) =>
+          setForm({ ...form, criteria: e.target.value })
+        }
+        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <input
+        required
+        placeholder="Country"
+        value={form.country}
+        onChange={(e) =>
+          setForm({ ...form, country: e.target.value })
+        }
+        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <input
+        required
+        placeholder="City"
+        value={form.city}
+        onChange={(e) =>
+          setForm({ ...form, city: e.target.value })
+        }
+        className="rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <input
+        required
+        placeholder="Salary, e.g. 1,800 SAR / month"
+        value={form.salary}
+        onChange={(e) =>
+          setForm({ ...form, salary: e.target.value })
+        }
+        className="sm:col-span-2 rounded-card border border-navy/20 px-3.5 py-2.5 text-sm outline-none focus:border-stamp"
+      />
+
+      <button
+        type="submit"
+        disabled={submitting || !me}
+        className="sm:col-span-2 mt-1 rounded-card bg-navy text-paper text-sm font-medium py-2.5 hover:bg-navy-600 transition-colors disabled:opacity-50"
+      >
         {submitting ? 'Posting…' : 'Post job'}
       </button>
     </form>

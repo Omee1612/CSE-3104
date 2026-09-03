@@ -112,4 +112,20 @@ export async function createJob(payload) {
   const { data } = await api.post('/jobs', payload)
   return data
 }
+export async function uploadVerification(file) {
+  const formData = new FormData()
+  formData.append('document', file)
+  const { data } = await api.post('/verification', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+export async function fetchInsights() {
+  const { data } = await api.get('/insights')
+  return data
+}
+export async function fetchVerificationStatus() {
+  const { data } = await api.get('/verification/status')
+  return data
+}
 export default api

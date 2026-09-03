@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar.jsx'
 import StatusBadge from '../components/StatusBadge.jsx'
@@ -21,13 +22,19 @@ export default function Applications() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchMe().then(setMe).catch(() => {})
+    fetchMe()
+      .then(setMe)
+      .catch(() => {
+        setError('Failed to load user information.')
+        setLoading(false)
+      })
   }, [])
 
   const load = () => {
     if (!me) return
 
     setLoading(true)
+    setError('')
 
     const fetcher =
       me.role === 'agency'
@@ -40,11 +47,17 @@ export default function Applications() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [me])
+  useEffect(() => {
+    load()
+  }, [me])
 
   const handleDecision = async (id, status) => {
-    await updateApplicationStatus(id, status)
-    load()
+    try {
+      await updateApplicationStatus(id, status)
+      load()
+    } catch (err) {
+      setError('Failed to update application status.')
+    }
   }
 
   return (
@@ -83,7 +96,7 @@ export default function Applications() {
             </p>
           )}
 
-          {/* Worker applications */}
+          {/* WORKER VIEW */}
           {!loading &&
             me?.role === 'worker' &&
             items.map((app) => (
@@ -93,11 +106,11 @@ export default function Applications() {
               >
                 <div>
                   <p className="font-display text-lg text-navy">
-                    {app.job?.title}
+                    {app.job_title}
                   </p>
 
                   <p className="text-sm text-navy/60">
-                    {app.job?.agency}
+                    {app.job_agency}
                   </p>
                 </div>
 
@@ -107,7 +120,7 @@ export default function Applications() {
               </div>
             ))}
 
-          {/* Agency applications */}
+          {/* AGENCY VIEW */}
           {!loading &&
             me?.role === 'agency' &&
             items.map((app) => (
@@ -117,11 +130,11 @@ export default function Applications() {
               >
                 <div>
                   <p className="font-display text-lg text-navy">
-                    {app.applicant?.name}
+                    {app.applicant_name}
                   </p>
 
                   <p className="text-sm text-navy/60">
-                    Applied to {app.job?.title} · {app.applicant?.email}
+                    Applied to {app.job_title} · {app.applicant_email}
                   </p>
 
                   {app.note && (
@@ -176,3 +189,4 @@ export default function Applications() {
     </div>
   )
 }
+
