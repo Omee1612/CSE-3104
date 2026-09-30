@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar.jsx'
 import StatusBadge from '../components/StatusBadge.jsx'
+import JobDetailModal from '../components/JobDetailModal.jsx'
 import {
   fetchMe,
   fetchMyApplications,
@@ -20,21 +20,16 @@ export default function Applications() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedJob, setSelectedJob] = useState(null)
 
   useEffect(() => {
-    fetchMe()
-      .then(setMe)
-      .catch(() => {
-        setError('Failed to load user information.')
-        setLoading(false)
-      })
+    fetchMe().then(setMe).catch(() => {})
   }, [])
 
   const load = () => {
     if (!me) return
 
     setLoading(true)
-    setError('')
 
     const fetcher =
       me.role === 'agency'
@@ -47,17 +42,11 @@ export default function Applications() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    load()
-  }, [me])
+  useEffect(load, [me])
 
   const handleDecision = async (id, status) => {
-    try {
-      await updateApplicationStatus(id, status)
-      load()
-    } catch (err) {
-      setError('Failed to update application status.')
-    }
+    await updateApplicationStatus(id, status)
+    load()
   }
 
   return (
@@ -96,21 +85,42 @@ export default function Applications() {
             </p>
           )}
 
-          {/* WORKER VIEW */}
+          {/* Worker applications */}
           {!loading &&
             me?.role === 'worker' &&
             items.map((app) => (
               <div
                 key={app.id}
-                className="bg-white rounded-card border border-navy/10 p-5 flex items-center justify-between"
+                onClick={() => app.job && setSelectedJob(app.job)}
+                role={app.job ? 'button' : undefined}
+                tabIndex={app.job ? 0 : undefined}
+                onKeyDown={(e) => {
+                  if (app.job && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    setSelectedJob(app.job)
+                  }
+                }}
+                className={`group bg-white rounded-card border border-navy/10 p-5 flex items-center justify-between transition-all duration-200 ${
+                  app.job ? 'cursor-pointer hover:border-navy/30 hover:shadow-sm' : ''
+                }`}
               >
                 <div>
-                  <p className="font-display text-lg text-navy">
-                    {app.job_title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-display text-lg text-navy group-hover:text-navy-900">
+                      {app.job?.title}
+                    </p>
+                    {app.job?.verified ? (
+                      <StatusBadge level="verified">Verified Job</StatusBadge>
+                    ) : (
+                      <StatusBadge level="alert">Unverified Job</StatusBadge>
+                    )}
+                  </div>
 
-                  <p className="text-sm text-navy/60">
-                    {app.job_agency}
+                  <p className="text-sm text-navy/60 mt-0.5 flex items-center gap-3">
+                    <span>{app.job?.agency}</span>
+                    <span className="text-xs text-stamp-dark font-mono font-medium group-hover:underline">
+                      Enlarge circular ↗
+                    </span>
                   </p>
                 </div>
 
@@ -120,7 +130,7 @@ export default function Applications() {
               </div>
             ))}
 
-          {/* AGENCY VIEW */}
+          {/* Agency applications */}
           {!loading &&
             me?.role === 'agency' &&
             items.map((app) => (
@@ -129,12 +139,19 @@ export default function Applications() {
                 className="bg-white rounded-card border border-navy/10 p-5 flex items-center justify-between"
               >
                 <div>
-                  <p className="font-display text-lg text-navy">
-                    {app.applicant_name}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-display text-lg text-navy">
+                      {app.applicant?.name}
+                    </p>
+                    {app.applicant?.verification_status === 'verified' ? (
+                      <StatusBadge level="verified">Verified Worker</StatusBadge>
+                    ) : (
+                      <StatusBadge level="alert">Unverified Worker</StatusBadge>
+                    )}
+                  </div>
 
-                  <p className="text-sm text-navy/60">
-                    Applied to {app.job_title} · {app.applicant_email}
+                  <p className="text-sm text-navy/60 mt-0.5">
+                    Applied to {app.job?.title} · {app.applicant?.email} · {app.applicant?.phone}
                   </p>
 
                   {app.note && (
@@ -185,8 +202,16 @@ export default function Applications() {
               </div>
             ))}
         </div>
+
+        {selectedJob && (
+          <JobDetailModal
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+            isApplied={true}
+            userRole={me?.role}
+          />
+        )}
       </main>
     </div>
   )
 }
-

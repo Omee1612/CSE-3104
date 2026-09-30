@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class JobApplication extends Model
 {
     // app/Models/JobApplication.php
-    // app/Models/JobApplication.php
     protected $fillable = [
         'job_listing_id',
         'applicant_id',
@@ -15,6 +14,7 @@ class JobApplication extends Model
         'note',
         'status',
     ];
+
     public function job()
     {
         return $this->belongsTo(JobListing::class, 'job_listing_id');

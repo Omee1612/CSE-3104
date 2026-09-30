@@ -2,79 +2,153 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Contract;
+use App\Models\User;
+use App\Services\ContractService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ContractController extends Controller
 {
-    // READ — all contracts belonging to the logged-in user
+    public function __construct(
+        protected ContractService $contractService
+    ) {}
+
+    // READ — all contracts belonging to or issued by the logged-in user
     public function index(Request $request)
     {
-        $contracts = DB::select(
-            "SELECT * FROM contracts WHERE user_id = ? ORDER BY created_at DESC",
-            [$request->user()->id]
+        return response()->json(
+            $this->contractService->getUserContracts($request->user())
         );
-        return response()->json($contracts);
     }
 
     // READ — one contract
-    public function show($id)
+    public function show(Request $request, Contract $contract)
     {
-        $contract = DB::select("SELECT * FROM contracts WHERE id = ?", [$id])[0] ?? null;
-        return response()->json($contract);
+        $user = $request->user();
+
+        // Worker can only view contracts assigned to them
+        if ($user->role === 'worker' && $contract->user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized access to contract.'], 403);
+        }
+
+        // Agency can only view contracts they issued
+        if ($user->role === 'agency' && $contract->agency_id !== $user->id && $contract->agency_name !== ($user->agency ?: $user->name)) {
+            return response()->json(['message' => 'Unauthorized access to contract.'], 403);
+        }
+
+        return response()->json(
+            $contract->load(['user:id,name,email,phone,tracking_id,destination', 'agency:id,name,email,agency'])
+        );
     }
 
-    // CREATE
+    // READ — candidate workers for contract issuance (Agency only)
+    public function availableWorkers(Request $request)
+    {
+        if ($request->user()->role !== 'agency' && $request->user()->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json(
+            $this->contractService->getAvailableWorkers($request->user())
+        );
+    }
+
+    // CREATE — Strictly Recruitment Agencies & Admins
     public function store(Request $request)
     {
+        $user = $request->user();
+
+        // Migrant workers are NOT allowed to issue contracts
+        if ($user->role === 'worker') {
+            return response()->json([
+                'message' => 'Migrant workers cannot create contracts. Contracts must be officially issued by a licensed recruiting agency or verified employer.',
+            ], 403);
+        }
+
         $data = $request->validate([
-            'job_title' => 'required|string|max:255',
+            'worker_id'           => 'nullable|exists:users,id',
+            'worker_tracking_id'  => 'nullable|string|max:50',
+            'worker_email'        => 'nullable|email',
+            'job_title'           => 'required|string|max:255',
             'destination_country' => 'required|string|max:255',
-            'agency_name' => 'required|string|max:255',
-            'salary_amount' => 'required|numeric',
-            'salary_currency' => 'nullable|string|max:10',
+            'agency_name'         => 'nullable|string|max:255',
+            'salary_amount'       => 'required|numeric|min:1',
+            'salary_currency'     => 'nullable|string|max:10',
+            'contract_terms'      => 'nullable|string|max:5000',
         ]);
 
-        $now = now();
-        $id = DB::table('contracts')->insertGetId([
-            'user_id' => $request->user()->id,
-            'job_title' => $data['job_title'],
-            'destination_country' => $data['destination_country'],
-            'agency_name' => $data['agency_name'],
-            'salary_amount' => $data['salary_amount'],
-            'salary_currency' => $data['salary_currency'] ?? null,
-            'status' => 'pending',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        // Resolve target worker
+        $worker = null;
+        if (!empty($data['worker_id'])) {
+            $worker = User::where('role', 'worker')->find($data['worker_id']);
+        } elseif (!empty($data['worker_tracking_id'])) {
+            $worker = User::where('role', 'worker')->where('tracking_id', trim($data['worker_tracking_id']))->first();
+        } elseif (!empty($data['worker_email'])) {
+            $worker = User::where('role', 'worker')->where('email', trim($data['worker_email']))->first();
+        }
 
-        $contract = DB::select("SELECT * FROM contracts WHERE id = ?", [$id])[0];
+        if (!$worker) {
+            return response()->json([
+                'message' => 'Target worker not found. Please provide a valid worker selection, Tracking ID, or registered email.',
+            ], 422);
+        }
+
+        $contract = $this->contractService->issueContract($user, $worker, $data);
+
         return response()->json($contract, 201);
     }
 
     // UPDATE
-    public function update(Request $request, $id)
+    public function update(Request $request, Contract $contract)
     {
+        $user = $request->user();
+
+        // Workers cannot alter contract salary or clauses
+        if ($user->role === 'worker') {
+            return response()->json([
+                'message' => 'Workers cannot modify official contract terms. If there is a discrepancy, please file a complaint.',
+            ], 403);
+        }
+
+        // Agency can only edit their own contracts
+        if ($user->role === 'agency' && $contract->agency_id !== $user->id && $contract->agency_name !== ($user->agency ?: $user->name)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $data = $request->validate([
-            'job_title' => 'sometimes|string|max:255',
+            'job_title'           => 'sometimes|string|max:255',
             'destination_country' => 'sometimes|string|max:255',
-            'agency_name' => 'sometimes|string|max:255',
-            'salary_amount' => 'sometimes|numeric',
-            'salary_currency' => 'sometimes|string|max:10',
-            'status' => 'sometimes|in:pending,verified,rejected',
+            'agency_name'         => 'sometimes|string|max:255',
+            'salary_amount'       => 'sometimes|numeric|min:1',
+            'salary_currency'     => 'sometimes|string|max:10',
+            'status'              => 'sometimes|in:pending,verified,rejected',
+            'contract_terms'      => 'nullable|string|max:5000',
         ]);
 
-        $data['updated_at'] = now();
-        DB::table('contracts')->where('id', $id)->update($data);
+        $contract = $this->contractService->updateContract($contract, $data);
 
-        $contract = DB::select("SELECT * FROM contracts WHERE id = ?", [$id])[0];
         return response()->json($contract);
     }
 
     // DELETE
-    public function destroy($id)
+    public function destroy(Request $request, Contract $contract)
     {
-        DB::delete("DELETE FROM contracts WHERE id = ?", [$id]);
-        return response()->json(['message' => 'Contract deleted']);
+        $user = $request->user();
+
+        // Workers cannot delete contracts
+        if ($user->role === 'worker') {
+            return response()->json([
+                'message' => 'Migrant workers cannot delete official registry contracts.',
+            ], 403);
+        }
+
+        // Agency check
+        if ($user->role === 'agency' && $contract->agency_id !== $user->id && $contract->agency_name !== ($user->agency ?: $user->name)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $this->contractService->deleteContract($contract);
+
+        return response()->json(['message' => 'Contract deleted successfully']);
     }
 }

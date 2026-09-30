@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadVerification } from '../lib/api.js'
+import { bypassVerification, uploadVerification } from '../lib/api.js'
 
 export default function Verify() {
   const [file, setFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [bypassing, setBypassing] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const navigate = useNavigate()
@@ -24,6 +25,19 @@ export default function Verify() {
       setError(err.response?.data?.message || 'Upload failed.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleBypass = async () => {
+    setBypassing(true)
+    setError('')
+    try {
+      await bypassVerification()
+      navigate('/profile', { replace: true })
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Could not continue without verification.')
+    } finally {
+      setBypassing(false)
     }
   }
 
@@ -68,6 +82,21 @@ export default function Verify() {
             {submitting ? 'Checking…' : 'Submit for verification'}
           </button>
         </form>
+
+        <div className="mt-6 border-t border-navy/10 pt-5">
+          <p className="text-sm font-medium text-navy">Not ready to verify?</p>
+          <p className="mt-1 text-xs text-navy/55">
+            You can continue now, but your account will remain unverified until you submit your documents.
+          </p>
+          <button
+            type="button"
+            onClick={handleBypass}
+            disabled={bypassing || submitting}
+            className="mt-3 w-full border border-navy/20 px-4 py-2.5 text-sm font-medium text-navy hover:bg-paper disabled:opacity-60"
+          >
+            {bypassing ? 'Continuing…' : 'Continue unverified'}
+          </button>
+        </div>
       </div>
     </div>
   )

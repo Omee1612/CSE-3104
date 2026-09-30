@@ -24,15 +24,23 @@ class User extends Authenticatable
         'verification_note',
         'verified_at',
     ];
+
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
-        return ['password' => 'hashed'];
+        return [
+            'password' => 'hashed',
+            'verified_at' => 'datetime',
+        ];
     }
     public function contracts()
     {
         return $this->hasMany(Contract::class);
+    }
+    public function issuedContracts()
+    {
+        return $this->hasMany(Contract::class, 'agency_id');
     }
     public function documents()
     {
@@ -46,5 +54,20 @@ class User extends Authenticatable
     public function applications()
     {
         return $this->hasMany(JobApplication::class, 'applicant_id');
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function complaints()
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
     }
 }

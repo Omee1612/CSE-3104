@@ -2,68 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\VerificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class VerificationController extends Controller
 {
+    public function __construct(
+        protected VerificationService $verificationService
+    ) {
+    }
+
+    /**
+     * Upload identification or agency license document for AI verification.
+     */
     public function store(Request $request)
     {
         $request->validate([
-            'document' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'document' => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:10240', // 10MB
         ]);
 
-        $userId = $request->user()->id;
-        $path = $request->file('document')->store('verifications', 'public');
-
-        DB::update(
-            "UPDATE users SET verification_document_path = ?, verification_status = ?, updated_at = ? WHERE id = ?",
-            [$path, 'pending', now(), $userId]
+        $result = $this->verificationService->verifyUserDocument(
+            $request->user(),
+            $request->file('document')
         );
 
-        $result = $this->runAiCheck($path);
-
-        DB::update(
-            "UPDATE users SET verification_status = ?, verification_note = ?, verified_at = ?, updated_at = ? WHERE id = ?",
-            [
-                $result['authentic'] ? 'verified' : 'rejected',
-                $result['reason'],
-                $result['authentic'] ? now() : null,
-                now(),
-                $userId,
-            ]
-        );
-
-        $user = DB::select("SELECT verification_status, verification_note FROM users WHERE id = ?", [$userId])[0];
-
-        return response()->json([
-            'status' => $user->verification_status,
-            'note' => $user->verification_note,
-        ]);
+        return response()->json($result);
     }
 
-    private function runAiCheck(string $path): array
+    /**
+     * Skip/bypass document verification.
+     * Sets user verification status to 'unverified'.
+     */
+    public function bypass(Request $request)
     {
-        $fullPath = storage_path('app/public/' . $path);
-        $size = @filesize($fullPath) ?: 0;
-
-        if ($size < 5000) {
-            return ['authentic' => false, 'reason' => 'Document appears incomplete or unreadable. Please re-upload a clear scan.'];
+        if (!in_array($request->user()->role, ['worker', 'agency'], true)) {
+            return response()->json(['message' => 'Only workers and agencies can bypass verification.'], 403);
         }
 
-        return ['authentic' => true, 'reason' => 'Document passed automated authenticity checks.'];
+        if ($request->user()->verification_status === 'verified') {
+            return response()->json(['message' => 'This account is already verified.'], 409);
+        }
+
+        $result = $this->verificationService->bypassVerification($request->user());
+
+        return response()->json($result);
     }
 
+    /**
+     * Get current verification status for the authenticated user.
+     */
     public function status(Request $request)
     {
-        $user = DB::select(
-            "SELECT verification_status, verification_note FROM users WHERE id = ?",
-            [$request->user()->id]
-        )[0];
+        $result = $this->verificationService->getStatus($request->user());
 
-        return response()->json([
-            'status' => $user->verification_status,
-            'note' => $user->verification_note,
-        ]);
+        return response()->json($result);
     }
 }

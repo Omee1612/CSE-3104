@@ -9,9 +9,14 @@ import WorkerDashboard from './pages/WorkerDashboard.jsx'
 import JobSearch from './pages/JobSearch.jsx'
 import Documents from './pages/Documents.jsx'
 import Applications from './pages/Applications.jsx'
+import Contracts from './pages/Contracts.jsx'
+import Payments from './pages/Payments.jsx'
+import Complaints from './pages/Complaints.jsx'
 import Insights from './pages/Insights.jsx'
+import Profile from './pages/Profile.jsx'
+import DunkiAssistantWidget from './components/DunkiAssistantWidget.jsx'
 
-function RequireVerified({ children }) {
+function RequireAuth({ children }) {
   const [me, setMe] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -20,27 +25,32 @@ function RequireVerified({ children }) {
   }, [])
 
   if (loading) return null
-  if (me?.role === 'worker' && me?.verification_status !== 'verified') {
-    return <Navigate to="/verify" replace />
+  if (!me) {
+    return <Navigate to="/login" replace />
   }
   return children
 }
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/verify" element={<Verify />} />
-      <Route path="/dashboard" element={<RequireVerified><WorkerDashboard /></RequireVerified>} />
-      <Route path="/jobs" element={<RequireVerified><JobSearch /></RequireVerified>} />
-      <Route path="/documents" element={<RequireVerified><Documents /></RequireVerified>} />
-      <Route path="/applications" element={<RequireVerified><Applications /></RequireVerified>} />
-      <Route path="/payments" element={<RequireVerified><WorkerDashboard /></RequireVerified>} />
-      <Route path="/complaints" element={<RequireVerified><WorkerDashboard /></RequireVerified>} />     
-      <Route path="/insights" element={<RequireVerified><Insights /></RequireVerified>} />
-      <Route path="*" element={<Landing />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify" element={<Verify />} />
+        <Route path="/dashboard" element={<RequireAuth><WorkerDashboard /></RequireAuth>} />
+        <Route path="/jobs" element={<RequireAuth><JobSearch /></RequireAuth>} />
+        <Route path="/documents" element={<RequireAuth><Documents /></RequireAuth>} />
+        <Route path="/applications" element={<RequireAuth><Applications /></RequireAuth>} />
+        <Route path="/contracts" element={<RequireAuth><Contracts /></RequireAuth>} />
+        <Route path="/payments" element={<RequireAuth><Payments /></RequireAuth>} />
+        <Route path="/complaints" element={<RequireAuth><Complaints /></RequireAuth>} />
+        <Route path="/insights" element={<RequireAuth><Insights /></RequireAuth>} />
+        <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+        <Route path="*" element={<Landing />} />
+      </Routes>
+      <DunkiAssistantWidget />
+    </>
   )
 }
